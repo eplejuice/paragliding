@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 	"regexp"
 	"time"
 
 	"github.com/marni/goigc"
+	"gopkg.in/mgo.v2/bson"
 )
 
 func handleRouter(w http.ResponseWriter, r *http.Request) {
@@ -32,7 +34,7 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// This handles the	GET /api/igc/id
-	regHandleParaglidingAPITrackID, err := regexp.Compile("^/paragliding/api/track/[0-9]+/?$")
+	regHandleParaglidingAPITrackID, err := regexp.Compile("^/paragliding/api/track/[a-zA-Z0-9]+/?$")
 	if err != nil {
 		handleError(w, r, err, http.StatusBadRequest)
 		return
@@ -206,6 +208,7 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 
 	// The struct used to put data into the database
 	track := Track{
+		ID:          bson.NewObjectId(),
 		Timestamp:   Uniq,
 		Url:         tmp.Url,
 		HDate:       tmpTrack.Header.Date,
@@ -223,11 +226,14 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 
 	// The struct used to return the ID
 	type ReturnId struct {
-		ID int64 `json:"id"`
+		ID string `json:"id"`
 	}
 
+	// converts the bson object to a string
+	AsString := track.ID.Hex()
+
 	// Returns the ID as a json back to the user
-	RID := ReturnId{Uniq}
+	RID := ReturnId{AsString}
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(RID)
 	if err != nil {
@@ -239,6 +245,16 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
+	// Base lets us get the last value of the Url, which in this case is the ID
+	tmp := path.Base(r.URL.Path)
+
+	track, err := IGF.FindOne(tmp)
+	if err != nil {
+		fmt.Println("Findone failed")
+		handleError(w, r, err, http.StatusBadRequest)
+		return
+	}
+	JsonStringResponse(w, http.StatusOK, track)
 
 }
 
