@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"path"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/marni/goigc"
@@ -41,7 +42,7 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// This handles the GET /api/igc/id/field
-	regHandleParaglidingAPITrackIDField, err := regexp.Compile("^/paragliding/api/igc/[0-9]+/(pilot|glider|glider_id|track_lenght|H_date|track_src_url)$")
+	regHandleParaglidingAPITrackIDField, err := regexp.Compile("^/paragliding/api/track/[a-zA-Z0-9]+/(pilot|glider|glider_id|track_length|H_date|track_src_url)$")
 	if err != nil {
 		handleError(w, r, err, http.StatusBadRequest)
 		return
@@ -111,6 +112,7 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 	case regHandleParaglidingAPIWebhookNewID.MatchString(r.URL.Path):
 		handleParaglidingAPIWebhookNewID(w, r)
 	default:
+		fmt.Println("DEFAULT")
 		handleError(w, r, nil, http.StatusBadRequest)
 	}
 }
@@ -175,8 +177,11 @@ func handleGetParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleError(w, r, err, http.StatusBadRequest)
 	}
-
-	JsonStringResponse(w, http.StatusOK, tracks)
+	var trackks []string
+	for i := 0; i < len(tracks); i++ {
+		trackks = append(trackks, (tracks[i].ID.Hex()))
+	}
+	JsonStringResponse(w, http.StatusOK, trackks)
 }
 
 // Lets a user post a new track into the database with a url to an igcfile
@@ -259,11 +264,57 @@ func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("finding field")
+	// First use Base to get the last value of the Url which is field.
+	field := path.Base(r.URL.Path)
+	// Dir returns everything in the URL, but the last value.
+	// this way we can use Base again, but this time ID is the last value of the Url
+	tmp := path.Dir(r.URL.Path)
+	nummer := path.Base(tmp)
 
+	fmt.Println(field)
+	fmt.Println(nummer)
+
+	track, err := IGF.FindOne(nummer)
+	if err != nil {
+		fmt.Println("Findone failed")
+		handleError(w, r, err, http.StatusBadRequest)
+		return
+	}
+
+	s, err := igc.ParseLocation(track.Url)
+	switch field {
+	case "H_date":
+		text, err := track.HDate.MarshalText()
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		w.Write(text)
+	case "pilot":
+		w.Write([]byte(track.Pilot))
+	case "glider":
+		w.Write([]byte(track.Glider))
+	case "glider_id":
+		w.Write([]byte(track.GliderID))
+	case "track_src_url":
+		w.Write([]byte(track.Url))
+	case "track_length":
+		w.Write([]byte(strconv.Itoa(int(getTrackLenght(s)))))
+	}
 }
 
 func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
-
+	track, err := IGF.FindLatest()
+	fmt.Println(track)
+	if err != nil {
+		fmt.Println("FindLatest failed")
+		handleError(w, r, err, http.StatusBadRequest)
+		return
+	}
+	text := []byte(strconv.FormatInt(track.Timestamp, 10))
+	w.Write(text)
+	fmt.Println(track)
 }
 
 func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {

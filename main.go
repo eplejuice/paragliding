@@ -68,7 +68,7 @@ func (m *IgcFiles) Insert(track Track) error {
 func (m *IgcFiles) FindAll() ([]Track, error) {
 	fmt.Println("Trying to find all")
 	var tracks []Track
-	err := db.C(COLLECTION).Find(bson.M{}).All(&tracks)
+	err := db.C(COLLECTION).Find(nil).All(&tracks)
 	return tracks, err
 }
 
@@ -76,5 +76,11 @@ func (m *IgcFiles) FindOne(id string) (Track, error) {
 	fmt.Println("Trying to find one by id")
 	var track Track
 	err := db.C(COLLECTION).FindId(bson.ObjectIdHex(id)).One(&track)
+	return track, err
+}
+
+func (m *IgcFiles) FindLatest() (Track, error) {
+	var track Track
+	err := db.C(COLLECTION).Find(bson.M{"$natural": -1}).One(&track)
 	return track, err
 }
