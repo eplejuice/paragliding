@@ -79,6 +79,20 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	regHandleAdminApiTracksCount, err := regexp.Compile("^/admin/api/tracks_count/?$")
+
+	if err != nil {
+		handleError(w, r, err, http.StatusBadRequest)
+		return
+	}
+
+	regHandleAdminApiTracks, err := regexp.Compile("^/admin/api/tracks/?$")
+
+	if err != nil {
+		handleError(w, r, err, http.StatusBadRequest)
+		return
+	}
+
 	// This is a switch that always runs routes the http request to the right handlefunc
 	// Otherwise the dafault gives the user a httpBadRequest response
 	switch {
@@ -111,6 +125,12 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 
 	case regHandleParaglidingAPIWebhookNewID.MatchString(r.URL.Path):
 		handleParaglidingAPIWebhookNewID(w, r)
+
+	case regHandleAdminApiTracksCount.MatchString(r.URL.Path):
+		handleGetAdminApiTracksCount(w, r)
+
+	case regHandleAdminApiTracks.MatchString(r.URL.Path):
+		handleDeleteAdminApiTracks(w, r)
 	default:
 		fmt.Println("DEFAULT")
 		handleError(w, r, nil, http.StatusBadRequest)
@@ -134,26 +154,30 @@ func handleParaglidingRedirect(w http.ResponseWriter, r *http.Request) {
 
 // Returns metadata about the program
 func handleParaglidingAPI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		type metaData struct {
+			Uptime  string
+			Info    string
+			Version string
+		}
+		// Using a struct to easily encode to a json
+		metaInfo := metaData{
+			Uptime:  calcTime(startTime),
+			Info:    "Service for Paragliding track",
+			Version: "v1",
+		}
 
-	type metaData struct {
-		Uptime  string
-		Info    string
-		Version string
+		// Using Marshal instead of Endoce, because i believe Marshal is used to encode strings
+		// and the struct mainly consist of strings.
+		metaResp, _ := json.Marshal(metaInfo)
+		// Sets the header to json, and returns a json object as the response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(metaResp)
 	}
-	// Using a struct to easily encode to a json
-	metaInfo := metaData{
-		Uptime:  calcTime(startTime),
-		Info:    "Service for Paragliding track",
-		Version: "v1",
-	}
-
-	// Using Marshal instead of Endoce, because i believe Marshal is used to encode strings
-	// and the struct mainly consist of strings.
-	metaResp, _ := json.Marshal(metaInfo)
-	// Sets the header to json, and returns a json object as the response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(metaResp)
 }
 
 // A Router wich handles a request to see if its either a GET or a POST request
@@ -250,71 +274,86 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
-	// Base lets us get the last value of the Url, which in this case is the ID
-	tmp := path.Base(r.URL.Path)
+	if r.Method != http.MethodGet {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		// Base lets us get the last value of the Url, which in this case is the ID
+		tmp := path.Base(r.URL.Path)
 
-	track, err := IGF.FindOne(tmp)
-	if err != nil {
-		fmt.Println("Findone failed")
-		handleError(w, r, err, http.StatusBadRequest)
-		return
-	}
-	JsonStringResponse(w, http.StatusOK, track)
-
-}
-
-func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("finding field")
-	// First use Base to get the last value of the Url which is field.
-	field := path.Base(r.URL.Path)
-	// Dir returns everything in the URL, but the last value.
-	// this way we can use Base again, but this time ID is the last value of the Url
-	tmp := path.Dir(r.URL.Path)
-	nummer := path.Base(tmp)
-
-	fmt.Println(field)
-	fmt.Println(nummer)
-
-	track, err := IGF.FindOne(nummer)
-	if err != nil {
-		fmt.Println("Findone failed")
-		handleError(w, r, err, http.StatusBadRequest)
-		return
-	}
-
-	s, err := igc.ParseLocation(track.Url)
-	switch field {
-	case "H_date":
-		text, err := track.HDate.MarshalText()
+		track, err := IGF.FindOne(tmp)
 		if err != nil {
+			fmt.Println("Findone failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
-		w.Write(text)
-	case "pilot":
-		w.Write([]byte(track.Pilot))
-	case "glider":
-		w.Write([]byte(track.Glider))
-	case "glider_id":
-		w.Write([]byte(track.GliderID))
-	case "track_src_url":
-		w.Write([]byte(track.Url))
-	case "track_length":
-		w.Write([]byte(strconv.Itoa(int(getTrackLenght(s)))))
+		JsonStringResponse(w, http.StatusOK, track)
+
+	}
+}
+
+func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		fmt.Println("finding field")
+		// First use Base to get the last value of the Url which is field.
+		field := path.Base(r.URL.Path)
+		// Dir returns everything in the URL, but the last value.
+		// this way we can use Base again, but this time ID is the last value of the Url
+		tmp := path.Dir(r.URL.Path)
+		nummer := path.Base(tmp)
+
+		fmt.Println(field)
+		fmt.Println(nummer)
+
+		track, err := IGF.FindOne(nummer)
+		if err != nil {
+			fmt.Println("Findone failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+		s, err := igc.ParseLocation(track.Url)
+		switch field {
+		case "H_date":
+			text, err := track.HDate.MarshalText()
+			if err != nil {
+				handleError(w, r, err, http.StatusBadRequest)
+				return
+			}
+			w.Write(text)
+		case "pilot":
+			w.Write([]byte(track.Pilot))
+		case "glider":
+			w.Write([]byte(track.Glider))
+		case "glider_id":
+			w.Write([]byte(track.GliderID))
+		case "track_src_url":
+			w.Write([]byte(track.Url))
+		case "track_length":
+			w.Write([]byte(strconv.Itoa(int(getTrackLenght(s)))))
+		}
 	}
 }
 
 func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
-	track, err := IGF.FindLatest()
-	fmt.Println(track)
-	if err != nil {
-		fmt.Println("FindLatest failed")
-		handleError(w, r, err, http.StatusBadRequest)
-		return
+	if r.Method != http.MethodGet {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		track, err := IGF.FindLatest()
+		fmt.Println(track)
+		if err != nil {
+			fmt.Println("FindLatest failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		text := []byte(strconv.FormatInt(track.Timestamp, 10))
+		w.Write(text)
+		fmt.Println(track)
 	}
-	text := []byte(strconv.FormatInt(track.Timestamp, 10))
-	w.Write(text)
-	fmt.Println(track)
 }
 
 func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
@@ -347,4 +386,37 @@ func handleGetWebhook(w http.ResponseWriter, r *http.Request) {
 
 func handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 
+}
+
+func handleGetAdminApiTracksCount(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		trackCount, err := IGF.FindCount()
+		if err != nil {
+			fmt.Println("Count all tracks failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		countString := strconv.Itoa(trackCount)
+		w.Write([]byte(countString))
+	} else {
+
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	}
+}
+
+func handleDeleteAdminApiTracks(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodDelete {
+		changeInfo, err := IGF.DeleteAll()
+		if err != nil {
+			fmt.Println("Delete all failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		fmt.Println(changeInfo)
+		//w.Write([]byte(changeInfo))
+	} else {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	}
 }

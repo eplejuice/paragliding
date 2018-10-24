@@ -81,6 +81,18 @@ func (m *IgcFiles) FindOne(id string) (Track, error) {
 
 func (m *IgcFiles) FindLatest() (Track, error) {
 	var track Track
-	err := db.C(COLLECTION).Find(bson.M{"$natural": -1}).One(&track)
+	size, err := db.C(COLLECTION).Count()
+
+	err = db.C(COLLECTION).Find(nil).Skip(size - 1).One(&track)
 	return track, err
+}
+
+func (m *IgcFiles) FindCount() (int, error) {
+	trackCount, err := db.C(COLLECTION).Count()
+	return trackCount, err
+}
+
+func (m *IgcFiles) DeleteAll() (*mgo.ChangeInfo, error) {
+	rem, err := db.C(COLLECTION).RemoveAll(nil)
+	return rem, err
 }
