@@ -371,7 +371,36 @@ func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		type rStruct struct {
+			T_latest   int64 `json:"t_latest"`
+			T_start    int64 `json:"t_start"`
+			T_stop     int64 `json:"t_stop"`
+			Tracks     []int `json:"tracks"`
+			Processing int64 `json:"processing"`
+		}
 
+		track, err := IGF.FindLatest()
+		fmt.Println(track)
+		if err != nil {
+			fmt.Println("FindLatest failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		returnSt := rStruct{
+			T_latest: track.Timestamp,
+		}
+
+		err = json.NewEncoder(w).Encode(returnSt)
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}
 }
 
 func handleParaglidingAPITickerTimestamp(w http.ResponseWriter, r *http.Request) {

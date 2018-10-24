@@ -109,3 +109,12 @@ func (m *IgcFiles) DeleteAll() (*mgo.ChangeInfo, error) {
 	rem, err := db.C(COLLECTION).RemoveAll(nil)
 	return rem, err
 }
+
+func (m *IgcFiles) FindOldest() (Track, error) {
+	var track Track
+	size, err := db.C(COLLECTION).Count()
+	// Mongodb stores object based on insertion time by default,
+	// so i just use the find all function, and skips all object except the last one (-1)
+	err = db.C(COLLECTION).Find(nil).Skip(1 - size).One(&track)
+	return track, err
+}
