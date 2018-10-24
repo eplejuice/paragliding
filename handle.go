@@ -154,6 +154,7 @@ func handleParaglidingRedirect(w http.ResponseWriter, r *http.Request) {
 
 // Returns metadata about the program
 func handleParaglidingAPI(w http.ResponseWriter, r *http.Request) {
+	// Checks if the method is GET, otherwise returns error
 	if r.Method != http.MethodGet {
 		status := http.StatusBadRequest
 		http.Error(w, http.StatusText(status), status)
@@ -196,15 +197,19 @@ func handleParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 
 // Returns an array containing the IDs of all stored tracks in the database
 func handleGetParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
-
+	// Calls the fundall function from main which returns all object from the db in a slice
 	tracks, err := IGF.FindAll()
 	if err != nil {
 		handleError(w, r, err, http.StatusBadRequest)
 	}
+	// makes a new slice to put the IDs in
 	var trackks []string
+	// Loops throught the slice with the objects from the db,
+	// and puts their IDs into the new slice
 	for i := 0; i < len(tracks); i++ {
 		trackks = append(trackks, (tracks[i].ID.Hex()))
 	}
+	// Sends the slice to be converted and responded as json
 	JsonStringResponse(w, http.StatusOK, trackks)
 }
 
@@ -274,6 +279,7 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
+	// checks if the method is actually Get
 	if r.Method != http.MethodGet {
 		status := http.StatusBadRequest
 		http.Error(w, http.StatusText(status), status)
@@ -281,18 +287,21 @@ func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
 		// Base lets us get the last value of the Url, which in this case is the ID
 		tmp := path.Base(r.URL.Path)
 
+		// Calls the findOne function which returns the object based in the ID in tmp
 		track, err := IGF.FindOne(tmp)
 		if err != nil {
 			fmt.Println("Findone failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
+		// Converts is to json and responds
 		JsonStringResponse(w, http.StatusOK, track)
 
 	}
 }
 
 func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
+	// Checks if the method is actually GET
 	if r.Method != http.MethodGet {
 		status := http.StatusBadRequest
 		http.Error(w, http.StatusText(status), status)
@@ -307,15 +316,16 @@ func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
 
 		fmt.Println(field)
 		fmt.Println(nummer)
-
+		// Uses the findOne function, with the nummber var to find the right object.
 		track, err := IGF.FindOne(nummer)
 		if err != nil {
 			fmt.Println("Findone failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
-
+		// Checks if the url in the object is an actual URL leading to and IGC file
 		s, err := igc.ParseLocation(track.Url)
+		// switches on the field parameter, and writes out the right data from the object
 		switch field {
 		case "H_date":
 			text, err := track.HDate.MarshalText()
@@ -339,10 +349,12 @@ func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
+	// Checks if the method is GET
 	if r.Method != http.MethodGet {
 		status := http.StatusBadRequest
 		http.Error(w, http.StatusText(status), status)
 	} else {
+		// Calls the FindLatest function from main, returns the latest object into track
 		track, err := IGF.FindLatest()
 		fmt.Println(track)
 		if err != nil {
@@ -350,6 +362,8 @@ func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
+		// Converts and writes the timestamp from the object as response.
+		// the 10 parameter is to convert to desimal, alternatively 16 for hex
 		text := []byte(strconv.FormatInt(track.Timestamp, 10))
 		w.Write(text)
 		fmt.Println(track)
@@ -368,6 +382,7 @@ func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) 
 
 }
 
+// This function redirects the user based on the method when sending the request
 func handleParaglidingAPIWebhookNewID(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -389,13 +404,16 @@ func handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetAdminApiTracksCount(w http.ResponseWriter, r *http.Request) {
+	// Checks if the method is GET, otherwise responds with error
 	if r.Method == http.MethodGet {
+		// calls the fund function which returns number of tracks into trackCount variable
 		trackCount, err := IGF.FindCount()
 		if err != nil {
 			fmt.Println("Count all tracks failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
+		// converts the int returned to a string, and then converts it to byte to write.
 		countString := strconv.Itoa(trackCount)
 		w.Write([]byte(countString))
 	} else {
@@ -406,13 +424,17 @@ func handleGetAdminApiTracksCount(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleDeleteAdminApiTracks(w http.ResponseWriter, r *http.Request) {
+	//Checks if the method is delete
 	if r.Method == http.MethodDelete {
+		// calls the delete all function from main
 		changeInfo, err := IGF.DeleteAll()
+		// checks if the function executed correctly
 		if err != nil {
 			fmt.Println("Delete all failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
+		// prints the output to console
 		fmt.Println(changeInfo)
 		//w.Write([]byte(changeInfo))
 	} else {
