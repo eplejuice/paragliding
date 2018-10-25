@@ -7,11 +7,15 @@ import (
 	"path"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/marni/goigc"
 	"gopkg.in/mgo.v2/bson"
 )
+
+// A mutex to lock/unlock the timestamp as a critical sector, to avoid duplicates
+var mutex = &sync.Mutex{}
 
 func handleRouter(w http.ResponseWriter, r *http.Request) {
 	// This handles the GET /api
@@ -215,9 +219,13 @@ func handleGetParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 
 // Lets a user post a new track into the database with a url to an igcfile
 func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
-
+	// Locks th critical sector before creating the unique timestamp
+	// So only one can be created at a time
+	mutex.Lock()
 	// Creating a unique monotone ID by converting a timestamp to milliseconds
 	Uniq := time.Now().UnixNano() / int64(time.Millisecond)
+	// Unlocks the critical sector again after creation
+	mutex.Unlock()
 
 	// Struct for handling the recieved url from the json object
 	type Tmp struct {
@@ -375,36 +383,61 @@ func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 		status := http.StatusBadRequest
 		http.Error(w, http.StatusText(status), status)
 	} else {
+		// Starts the timer to calculate processing time
+		start := time.Now()
 		type rStruct struct {
-			T_latest   int64 `json:"t_latest"`
-			T_start    int64 `json:"t_start"`
-			T_stop     int64 `json:"t_stop"`
-			Tracks     []int `json:"tracks"`
-			Processing int64 `json:"processing"`
+			T_latest   int64         `json:"t_latest"`
+			T_start    int64         `json:"t_start"`
+			T_stop     int64         `json:"t_stop"`
+			Tracks     []int64       `json:"tracks"`
+			Processing time.Duration `json:"processing"`
 		}
 
-		track, err := IGF.FindLatest()
-		fmt.Println(track)
+		trackLatest, err := IGF.FindLatest()
 		if err != nil {
 			fmt.Println("FindLatest failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
-		returnSt := rStruct{
-			T_latest: track.Timestamp,
+
+		trackStart, err := IGF.FindOldest()
+		if err != nil {
+			fmt.Println("FindOldest failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
 		}
 
+		var trackks []int64
+		for i := 0; i < 5; i++ {
+			trackks = append(trackks, (trackStart[i].Timestamp))
+		}
+		returnSt := rStruct{
+			T_latest:   trackLatest.Timestamp,
+			T_start:    trackks[0],
+			T_stop:     trackks[4],
+			Tracks:     trackks,
+			Processing: time.Since(start) / time.Millisecond,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(returnSt)
 		if err != nil {
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
-		w.WriteHeader(http.StatusOK)
 	}
 }
 
 func handleParaglidingAPITickerTimestamp(w http.ResponseWriter, r *http.Request) {
-
+	// checks if the method is actually Get
+	if r.Method != http.MethodGet {
+		status := http.StatusBadRequest
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		// Base lets us get the last value of the Url, which in this case is the ID
+		tmp := path.Base(r.URL.Path)
+		fmt.Println(tmp)
+	}
 }
 
 func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) {

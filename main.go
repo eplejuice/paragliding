@@ -90,10 +90,8 @@ func (m *IgcFiles) FindOne(id string) (Track, error) {
 // This function returns the latest inserted document in the database
 func (m *IgcFiles) FindLatest() (Track, error) {
 	var track Track
-	size, err := db.C(COLLECTION).Count()
-	// Mongodb stores object based on insertion time by default,
-	// so i just use the find all function, and skips all object except the last one (-1)
-	err = db.C(COLLECTION).Find(nil).Skip(size - 1).One(&track)
+	// Returns the first object of all documents sorted by "_id"
+	err := db.C(COLLECTION).Find(nil).Sort("-_id").One(&track)
 	return track, err
 }
 
@@ -110,11 +108,16 @@ func (m *IgcFiles) DeleteAll() (*mgo.ChangeInfo, error) {
 	return rem, err
 }
 
-func (m *IgcFiles) FindOldest() (Track, error) {
-	var track Track
-	size, err := db.C(COLLECTION).Count()
-	// Mongodb stores object based on insertion time by default,
-	// so i just use the find all function, and skips all object except the last one (-1)
-	err = db.C(COLLECTION).Find(nil).Skip(1 - size).One(&track)
-	return track, err
+func (m *IgcFiles) FindOldest() ([]Track, error) {
+	var tracks []Track
+	// Gets the first object when documents are sorted reverse order by giving "-" to _id
+	err := db.C(COLLECTION).Find(nil).Sort("_id").All(&tracks)
+	return tracks, err
+}
+
+func (m *IgcFiles) FindOldest(id int) ([]Track, error) {
+	var tracks []Track
+	// Gets the first object when documents are sorted reverse order by giving "-" to _id
+	err := db.C(COLLECTION).Find(nil).Sort("_id").All(&tracks)
+	return tracks, err
 }
