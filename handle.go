@@ -145,7 +145,7 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 // with the right error code based on the parameter recieved
 func handleError(w http.ResponseWriter, r *http.Request, err error, status int) {
 	if err != nil {
-		http.Error(w, fmt.Sprintf("%s/t%s", http.StatusText(status), err), status)
+		http.Error(w, fmt.Sprintf("%s %s", http.StatusText(status), err), status)
 	} else {
 		http.Error(w, fmt.Sprintf(http.StatusText(status)), status)
 	}
@@ -283,6 +283,8 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
+
+	invokeWebhooks(w, r)
 
 }
 
@@ -495,6 +497,7 @@ func handleParaglidingAPITickerTimestamp(w http.ResponseWriter, r *http.Request)
 }
 
 func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("New webhook")
 	// checks if the method is actually POST
 	if r.Method != http.MethodPost {
 		status := http.StatusMethodNotAllowed
@@ -513,16 +516,23 @@ func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		webhook := Webhooks{
-			ID:              bson.NewObjectId(),
-			WebhookURL:      params.WebHookURL,
-			MinTriggerValue: params.MinTriggerValue,
+		latestKnown, err := IGF.FindLatest()
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
 		}
-		err := IGF.NewWebHook(webhook)
+
+		webhook := Webhooks{
+			ID:               bson.NewObjectId(),
+			WebhookURL:       params.WebHookURL,
+			MinTriggerValue:  params.MinTriggerValue,
+			LatestKnownTrack: latestKnown.Timestamp,
+		}
+		err = IGF.NewWebHook(webhook)
 		if err != nil {
 			handleError(w, r, err, http.StatusBadRequest)
 		}
-		w.Write([]byte(webhook.ID))
+		w.Write([]byte(webhook.ID.Hex()))
 	}
 }
 

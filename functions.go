@@ -1,13 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	igc "github.com/marni/goigc"
+	"gopkg.in/mgo.v2/bson"
 )
 
 // This function is heavily influenced by:
@@ -86,4 +89,70 @@ func getTrackLenght(s igc.Track) float64 {
 		totalDistance += s.Points[i].Distance(s.Points[i+1])
 	}
 	return totalDistance
+}
+
+func invokeWebhooks(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("###################INVOKING WEBHOOKS##########################")
+	webhooks, err := IGF.getAllWebhooks()
+	if err != nil {
+		handleError(w, r, err, http.StatusBadRequest)
+	}
+
+	track, err := IGF.FindLatest()
+	if err != nil {
+		fmt.Println("FindLatest failed")
+		handleError(w, r, err, http.StatusBadRequest)
+		return
+	}
+	for _, hook := range webhooks {
+		start := time.Now()
+		type rStruct struct {
+			Latest     int64         `json:"t_latest"`
+			Tracks     []string      `json:"tracks"`
+			Processing time.Duration `json:"processing"`
+		}
+		trackLatestArr, err := IGF.FindOldestByIdWebhook(int(hook.LatestKnownTrack))
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		var trackks []int64
+		for i := 0; i < len(trackLatestArr); i++ {
+			trackks = append(trackks, (trackLatestArr[i].Timestamp))
+		}
+		var trackksID []string
+		for i := 0; i < len(trackLatestArr); i++ {
+			trackksID = append(trackksID, (trackLatestArr[i].ID.Hex()))
+		}
+
+		sliceLength := len(trackks)
+
+		returnSt := rStruct{
+			Latest:     track.Timestamp,
+			Tracks:     trackksID,
+			Processing: time.Since(start) / time.Millisecond,
+		}
+		if sliceLength > hook.MinTriggerValue {
+
+			payload := "Latest timestamp: " + strconv.Itoa(int(returnSt.Latest)) + ", " + strconv.Itoa(len(trackksID)) + " new tracks are: "
+			for _, track := range returnSt.Tracks {
+				payload = fmt.Sprintf("%s, %s", payload, track)
+			}
+			payload = fmt.Sprintf("%s. (processing %dms)", payload, returnSt.Processing)
+
+			type returnContent struct {
+				Payload string `json:"content"`
+			}
+
+			payloadStruct := returnContent{payload}
+			teemo, _ := json.Marshal(payloadStruct)
+			_, err = http.Post(hook.WebhookURL, "application/json", bytes.NewBuffer(teemo))
+			NowLatest := track.Timestamp
+			db.C(WEBHOOKS).Update(bson.M{"_id": hook.ID}, bson.M{"$set": bson.M{"latestKnownTrack": NowLatest}})
+		} else {
+			fmt.Println("minTriggerValue not high enough")
+			return
+		}
+	}
+
 }

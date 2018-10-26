@@ -131,3 +131,19 @@ func (m *IgcFiles) NewWebHook(webhook Webhooks) error {
 	err := db.C(WEBHOOKS).Insert(&webhook)
 	return err
 }
+
+func (m *IgcFiles) getAllWebhooks() ([]Webhooks, error) {
+	fmt.Println("Trying to find all")
+	var webhook []Webhooks
+	// Using the nil parameter in find gets all tracks
+	err := db.C(WEBHOOKS).Find(nil).All(&webhook)
+	return webhook, err
+}
+
+func (m *IgcFiles) FindOldestByIdWebhook(id int) ([]Track, error) {
+	var tracks []Track
+	var startPoint Track
+	err := db.C(COLLECTION).Find(bson.M{"timestamp": id}).One(&startPoint)
+	err = db.C(COLLECTION).Find(bson.M{"timestamp": bson.M{"$gt": startPoint.Timestamp}}).All(&tracks)
+	return tracks, err
+}
