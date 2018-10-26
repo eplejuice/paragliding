@@ -23,3 +23,9 @@ type Track struct {
 	GliderID    string        `bson:"glider_id" json:"glider_id"`
 	TrackLenght float64       `bson:"track_lenght" json:"track_lenght"`
 }
+
+type Webhooks struct {
+	ID              bson.ObjectId `bson:"_id"`
+	WebhookURL      string        `bson:"webhookURL" json:"webhookURL"`
+	MinTriggerValue int           `bson:"minTriggerValue" json:minTriggerValue"`
+}

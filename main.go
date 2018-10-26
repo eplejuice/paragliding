@@ -16,6 +16,7 @@ var db *mgo.Database
 
 const (
 	COLLECTION = "tracks"
+	WEBHOOKS   = "webhooks"
 )
 
 var IGF = IgcFiles{
@@ -110,14 +111,23 @@ func (m *IgcFiles) DeleteAll() (*mgo.ChangeInfo, error) {
 
 func (m *IgcFiles) FindOldest() ([]Track, error) {
 	var tracks []Track
-	// Gets the first object when documents are sorted reverse order by giving "-" to _id
-	err := db.C(COLLECTION).Find(nil).Sort("_id").All(&tracks)
+	// Gets the first 5 object when documents are sorted reverse order by giving "-" to _id
+	err := db.C(COLLECTION).Find(nil).Sort("timestamp").Limit(5).All(&tracks)
 	return tracks, err
 }
 
-func (m *IgcFiles) FindOldest(id int) ([]Track, error) {
+func (m *IgcFiles) FindOldestById(id int) ([]Track, error) {
 	var tracks []Track
-	// Gets the first object when documents are sorted reverse order by giving "-" to _id
-	err := db.C(COLLECTION).Find(nil).Sort("_id").All(&tracks)
+	var startPoint Track
+	err := db.C(COLLECTION).Find(bson.M{"timestamp": id}).One(&startPoint)
+	err = db.C(COLLECTION).Find(bson.M{"timestamp": bson.M{"$gt": startPoint.Timestamp}}).Limit(5).All(&tracks)
 	return tracks, err
+}
+
+func (m *IgcFiles) NewWebHook(webhook Webhooks) error {
+	fmt.Println("Trying to insert new webhook into the db")
+	// Inserts the webhook into the right collection in the database.
+	// returns error if failed
+	err := db.C(WEBHOOKS).Insert(&webhook)
+	return err
 }

@@ -160,7 +160,7 @@ func handleParaglidingRedirect(w http.ResponseWriter, r *http.Request) {
 func handleParaglidingAPI(w http.ResponseWriter, r *http.Request) {
 	// Checks if the method is GET, otherwise returns error
 	if r.Method != http.MethodGet {
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	} else {
 		type metaData struct {
@@ -194,7 +194,7 @@ func handleParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		handlePostParaglidingAPITrack(w, r)
 	default:
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	}
 }
@@ -289,7 +289,7 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
 	// checks if the method is actually Get
 	if r.Method != http.MethodGet {
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	} else {
 		// Base lets us get the last value of the Url, which in this case is the ID
@@ -311,7 +311,7 @@ func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
 func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
 	// Checks if the method is actually GET
 	if r.Method != http.MethodGet {
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	} else {
 		fmt.Println("finding field")
@@ -359,7 +359,7 @@ func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
 func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
 	// Checks if the method is GET
 	if r.Method != http.MethodGet {
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	} else {
 		// Calls the FindLatest function from main, returns the latest object into track
@@ -380,7 +380,7 @@ func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
 
 func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	} else {
 		// Starts the timer to calculate processing time
@@ -389,10 +389,9 @@ func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 			T_latest   int64         `json:"t_latest"`
 			T_start    int64         `json:"t_start"`
 			T_stop     int64         `json:"t_stop"`
-			Tracks     []int64       `json:"tracks"`
+			Tracks     []string      `json:"tracks"`
 			Processing time.Duration `json:"processing"`
 		}
-
 		trackLatest, err := IGF.FindLatest()
 		if err != nil {
 			fmt.Println("FindLatest failed")
@@ -406,16 +405,83 @@ func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
-
 		var trackks []int64
-		for i := 0; i < 5; i++ {
+		for i := 0; i < len(trackStart); i++ {
 			trackks = append(trackks, (trackStart[i].Timestamp))
 		}
+
+		var trackksID []string
+		for i := 0; i < len(trackStart); i++ {
+			trackksID = append(trackksID, (trackStart[i].ID.Hex()))
+		}
+
+		sliceLength := len(trackks)
 		returnSt := rStruct{
 			T_latest:   trackLatest.Timestamp,
 			T_start:    trackks[0],
-			T_stop:     trackks[4],
-			Tracks:     trackks,
+			T_stop:     trackks[sliceLength-1],
+			Tracks:     trackksID,
+			Processing: time.Since(start) / time.Millisecond,
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(returnSt)
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+
+		}
+	}
+}
+
+func handleParaglidingAPITickerTimestamp(w http.ResponseWriter, r *http.Request) {
+	// checks if the method is actually Get
+	if r.Method != http.MethodGet {
+		status := http.StatusMethodNotAllowed
+		http.Error(w, http.StatusText(status), status)
+	} else {
+
+		start := time.Now()
+		type rStruct struct {
+			T_latest   int64         `json:"t_latest"`
+			T_start    int64         `json:"t_start"`
+			T_stop     int64         `json:"t_stop"`
+			Tracks     []string      `json:"tracks"`
+			Processing time.Duration `json:"processing"`
+		}
+		trackLatest, err := IGF.FindLatest()
+		if err != nil {
+			fmt.Println("FindLatest failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+		// Base lets us get the last value of the Url, which in this case is the ID
+		tmp := path.Base(r.URL.Path)
+		tmpInt, _ := strconv.Atoi(tmp)
+		trackLatestArr, err := IGF.FindOldestById(tmpInt)
+
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		var trackks []int64
+		for i := 0; i < len(trackLatestArr); i++ {
+			trackks = append(trackks, (trackLatestArr[i].Timestamp))
+		}
+
+		var trackksID []string
+		for i := 0; i < len(trackLatestArr); i++ {
+			trackksID = append(trackksID, (trackLatestArr[i].ID.Hex()))
+		}
+
+		sliceLength := len(trackks)
+
+		returnSt := rStruct{
+			T_latest:   trackLatest.Timestamp,
+			T_start:    trackks[0],
+			T_stop:     trackks[sliceLength-1],
+			Tracks:     trackksID,
 			Processing: time.Since(start) / time.Millisecond,
 		}
 
@@ -428,20 +494,36 @@ func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleParaglidingAPITickerTimestamp(w http.ResponseWriter, r *http.Request) {
-	// checks if the method is actually Get
-	if r.Method != http.MethodGet {
-		status := http.StatusBadRequest
+func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) {
+	// checks if the method is actually POST
+	if r.Method != http.MethodPost {
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	} else {
-		// Base lets us get the last value of the Url, which in this case is the ID
-		tmp := path.Base(r.URL.Path)
-		fmt.Println(tmp)
+		type getParams struct {
+			WebHookURL      string `json:"webhookURL"`
+			MinTriggerValue int    `json:"minTriggerValue"`
+		}
+
+		params := getParams{}
+
+		defer r.Body.Close()
+		if err := json.NewDecoder(r.Body).Decode(&params); err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+		webhook := Webhooks{
+			ID:              bson.NewObjectId(),
+			WebhookURL:      params.WebHookURL,
+			MinTriggerValue: params.MinTriggerValue,
+		}
+		err := IGF.NewWebHook(webhook)
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+		}
+		w.Write([]byte(webhook.ID))
 	}
-}
-
-func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) {
-
 }
 
 // This function redirects the user based on the method when sending the request
@@ -452,7 +534,7 @@ func handleParaglidingAPIWebhookNewID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		handleDeleteWebhook(w, r)
 	default:
-		status := http.StatusBadRequest
+		status := http.StatusMethodNotAllowed
 		http.Error(w, http.StatusText(status), status)
 	}
 }
