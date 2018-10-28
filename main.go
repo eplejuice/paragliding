@@ -30,21 +30,24 @@ func main() {
 	fmt.Println("Starting main")
 
 	// Connects to the databse
+	fmt.Println("Connecting to database")
 	IGF.Connect()
-
+	fmt.Println("Connection success")
 	// Sends every request to the router function with Regex.
 	http.HandleFunc("/", handleRouter)
 
+	port := os.Getenv("PORT")
+	fmt.Println("WEIOJDSFOISJFIOSD " + port)
 	//Listens to the Url given by heroku
-	if err := http.ListenAndServe(":"+os.Getenv("MONGO_PORT"), nil); err != nil {
+	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		// If the Url is wrong the program shuts down immediately.
+		fmt.Printf("Listen and serve failed %s", err)
 		log.Fatal(err)
 	}
 
 }
 
 func (m *IgcFiles) Connect() {
-	fmt.Println("Connecting to database")
 	session := &mgo.DialInfo{
 		Addrs:    []string{m.Address},
 		Timeout:  60 * time.Second,
