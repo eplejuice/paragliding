@@ -91,6 +91,7 @@ func getTrackLenght(s igc.Track) float64 {
 	return totalDistance
 }
 
+// This function should be called whenever something is added to the database to notify all registered webhooks
 func invokeWebhooks(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("###################INVOKING WEBHOOKS##########################")
 	webhooks, err := IGF.getAllWebhooks()
@@ -98,6 +99,7 @@ func invokeWebhooks(w http.ResponseWriter, r *http.Request) {
 		handleError(w, r, err, http.StatusBadRequest)
 	}
 
+	//Finds the latest track to get the latest timestamp
 	track, err := IGF.FindLatest()
 	if err != nil {
 		fmt.Println("FindLatest failed")
@@ -111,6 +113,7 @@ func invokeWebhooks(w http.ResponseWriter, r *http.Request) {
 			Tracks     []string      `json:"tracks"`
 			Processing time.Duration `json:"processing"`
 		}
+		// Finds the latest timestamp to compare with the timestamps stored in the webhooks
 		trackLatestArr, err := IGF.FindOldestByIdWebhook(int(hook.LatestKnownTrack))
 		if err != nil {
 			handleError(w, r, err, http.StatusBadRequest)
@@ -132,22 +135,26 @@ func invokeWebhooks(w http.ResponseWriter, r *http.Request) {
 			Tracks:     trackksID,
 			Processing: time.Since(start) / time.Millisecond,
 		}
+		// Checks if there has been enough changes to trigget the webhook
 		if sliceLength > hook.MinTriggerValue {
-
+			// Makes the string to send to the webhook
 			payload := "Latest timestamp: " + strconv.Itoa(int(returnSt.Latest)) + ", " + strconv.Itoa(len(trackksID)) + " new tracks are: "
 			for _, track := range returnSt.Tracks {
 				payload = fmt.Sprintf("%s, %s", payload, track)
 			}
 			payload = fmt.Sprintf("%s. (processing %dms)", payload, returnSt.Processing)
 
+			// puts the string into a struct to encode
 			type returnContent struct {
 				Payload string `json:"content"`
 			}
 
 			payloadStruct := returnContent{payload}
 			teemo, _ := json.Marshal(payloadStruct)
+			// Posts the webhook to discord
 			_, err = http.Post(hook.WebhookURL, "application/json", bytes.NewBuffer(teemo))
 			NowLatest := track.Timestamp
+			// updates the latest known timestamp in the webhook to the newest in the database when invoked
 			db.C(WEBHOOKS).Update(bson.M{"_id": hook.ID}, bson.M{"$set": bson.M{"latestKnownTrack": NowLatest}})
 		} else {
 			fmt.Println("minTriggerValue not high enough")

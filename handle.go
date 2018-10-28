@@ -76,7 +76,7 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 		handleError(w, r, err, http.StatusBadRequest)
 		return
 	}
-	regHandleParaglidingAPIWebhookNewID, err := regexp.Compile("^/paragliding/api/webhook/new_track/[0-9]+/?$")
+	regHandleParaglidingAPIWebhookNewID, err := regexp.Compile("^/paragliding/api/webhook/new_track/[a-z0-9]+/?$")
 
 	if err != nil {
 		handleError(w, r, err, http.StatusBadRequest)
@@ -145,7 +145,7 @@ func handleRouter(w http.ResponseWriter, r *http.Request) {
 // with the right error code based on the parameter recieved
 func handleError(w http.ResponseWriter, r *http.Request, err error, status int) {
 	if err != nil {
-		http.Error(w, fmt.Sprintf("%s %s", http.StatusText(status), err), status)
+		http.Error(w, fmt.Sprintf("%s, %s", http.StatusText(status), err), status)
 	} else {
 		http.Error(w, fmt.Sprintf(http.StatusText(status)), status)
 	}
@@ -283,7 +283,7 @@ func handlePostParaglidingAPITrack(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-
+	//Notifies all registered webhooks that changes has been made
 	invokeWebhooks(w, r)
 
 }
@@ -296,6 +296,11 @@ func handleParaglidingAPITrackID(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Base lets us get the last value of the Url, which in this case is the ID
 		tmp := path.Base(r.URL.Path)
+		if !bson.IsObjectIdHex(tmp) {
+			status := http.StatusBadRequest
+			http.Error(w, http.StatusText(status), status)
+			return
+		}
 
 		// Calls the findOne function which returns the object based in the ID in tmp
 		track, err := IGF.FindOne(tmp)
@@ -323,6 +328,12 @@ func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
 		// this way we can use Base again, but this time ID is the last value of the Url
 		tmp := path.Dir(r.URL.Path)
 		nummer := path.Base(tmp)
+
+		if !bson.IsObjectIdHex(tmp) {
+			status := http.StatusBadRequest
+			http.Error(w, http.StatusText(status), status)
+			return
+		}
 
 		fmt.Println(field)
 		fmt.Println(nummer)
@@ -380,6 +391,7 @@ func handleParaglidingAPITickerLatest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//Returns info about the latest 5 added tracks
 func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		status := http.StatusMethodNotAllowed
@@ -394,38 +406,48 @@ func handleParaglidingAPITicker(w http.ResponseWriter, r *http.Request) {
 			Tracks     []string      `json:"tracks"`
 			Processing time.Duration `json:"processing"`
 		}
+		// finds the latest added track to the database
 		trackLatest, err := IGF.FindLatest()
 		if err != nil {
 			fmt.Println("FindLatest failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
-
+		// Finds the 5 oldest objects in the database
 		trackStart, err := IGF.FindOldest()
 		if err != nil {
 			fmt.Println("FindOldest failed")
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
+		// puts the timestamps of the returnes object into a slice
 		var trackks []int64
 		for i := 0; i < len(trackStart); i++ {
 			trackks = append(trackks, (trackStart[i].Timestamp))
 		}
 
+		// puts the IDs of the returned objects into a slice
 		var trackksID []string
 		for i := 0; i < len(trackStart); i++ {
 			trackksID = append(trackksID, (trackStart[i].ID.Hex()))
 		}
 
+		// checks how many object where actually returned
 		sliceLength := len(trackks)
+
+		// Puts the right values into the struct
 		returnSt := rStruct{
-			T_latest:   trackLatest.Timestamp,
-			T_start:    trackks[0],
+			T_latest: trackLatest.Timestamp,
+			// T_start is always the first object in the array
+			T_start: trackks[0],
+			// T_stop wil always be the last object int the array
+			// using length -1, bcus the array starts at 0
 			T_stop:     trackks[sliceLength-1],
 			Tracks:     trackksID,
 			Processing: time.Since(start) / time.Millisecond,
 		}
 
+		// Returns the content as json
 		w.Header().Set("Content-Type", "application/json")
 		err = json.NewEncoder(w).Encode(returnSt)
 		if err != nil {
@@ -458,11 +480,13 @@ func handleParaglidingAPITickerTimestamp(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		// Base lets us get the last value of the Url, which in this case is the ID
+		// Base lets us get the last value of the Url
+		// which in this case is the timestamp
 		tmp := path.Base(r.URL.Path)
 		tmpInt, _ := strconv.Atoi(tmp)
 		trackLatestArr, err := IGF.FindOldestById(tmpInt)
 
+		// The rest of the code is nearly identical to the function above
 		if err != nil {
 			handleError(w, r, err, http.StatusBadRequest)
 			return
@@ -508,6 +532,7 @@ func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) 
 			MinTriggerValue int    `json:"minTriggerValue"`
 		}
 
+		// Creates a struct to decode the the json object into
 		params := getParams{}
 
 		defer r.Body.Close()
@@ -516,12 +541,14 @@ func handlePOSTParaglidingAPIWebhookNew(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
+		// Finds the latest inserted object in the database
 		latestKnown, err := IGF.FindLatest()
 		if err != nil {
 			handleError(w, r, err, http.StatusBadRequest)
 			return
 		}
 
+		// Creates the actual webhook and sends it to be inserted
 		webhook := Webhooks{
 			ID:               bson.NewObjectId(),
 			WebhookURL:       params.WebHookURL,
@@ -549,14 +576,92 @@ func handleParaglidingAPIWebhookNewID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Returns the info about a webhook based on given ID
 func handleGetWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		status := http.StatusMethodNotAllowed
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		// Base lets us get the last value of the Url, which in this case is the ID
+		tmp := path.Base(r.URL.Path)
 
+		if !bson.IsObjectIdHex(tmp) {
+			status := http.StatusBadRequest
+			http.Error(w, http.StatusText(status), status)
+			return
+		}
+		// Calls the findOne function which returns the webhook based in the ID in tmp
+		webhook, err := IGF.FindOneWebhook(tmp)
+		if err != nil {
+			fmt.Println("Findone webhook failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		type returnVal struct {
+			WebhookURL      string `json:"webhookURL"`
+			MinTriggerValue int    `json:"minTriggerValue"`
+		}
+
+		RV := returnVal{
+			WebhookURL:      webhook.WebhookURL,
+			MinTriggerValue: webhook.MinTriggerValue,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(RV)
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+		// Converts is to json and responds
+
+	}
 }
 
+// Nearly identical to the function above, exepct it also deletes the object after
+// returning the values. Could perhaps be made into one function.
+// Ran out of time while thinking about it.
 func handleDeleteWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		status := http.StatusMethodNotAllowed
+		http.Error(w, http.StatusText(status), status)
+	} else {
+		// Base lets us get the last value of the Url, which in this case is the ID
+		tmp := path.Base(r.URL.Path)
 
+		if !bson.IsObjectIdHex(tmp) {
+			status := http.StatusBadRequest
+			http.Error(w, http.StatusText(status), status)
+			return
+
+		}
+		// This function retuns and deletes the function
+		webhook, err := IGF.DeleteOneHook(tmp)
+		if err != nil {
+			fmt.Println("Find and delete failed")
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+		type returnVal struct {
+			WebhookURL      string `json:"webhookURL"`
+			MinTriggerValue int    `json:"minTriggerValue"`
+		}
+
+		RV := returnVal{
+			WebhookURL:      webhook.WebhookURL,
+			MinTriggerValue: webhook.MinTriggerValue,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		err = json.NewEncoder(w).Encode(RV)
+		if err != nil {
+			handleError(w, r, err, http.StatusBadRequest)
+			return
+		}
+
+	}
 }
 
+// Returns a count of how many tracks exists in the database
 func handleGetAdminApiTracksCount(w http.ResponseWriter, r *http.Request) {
 	// Checks if the method is GET, otherwise responds with error
 	if r.Method == http.MethodGet {
@@ -577,6 +682,7 @@ func handleGetAdminApiTracksCount(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Deletes all tracks from the database
 func handleDeleteAdminApiTracks(w http.ResponseWriter, r *http.Request) {
 	//Checks if the method is delete
 	if r.Method == http.MethodDelete {

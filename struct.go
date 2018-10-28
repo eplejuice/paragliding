@@ -27,6 +27,6 @@ type Track struct {
 type Webhooks struct {
 	ID               bson.ObjectId `bson:"_id"`
 	WebhookURL       string        `bson:"webhookURL" json:"webhookURL"`
-	MinTriggerValue  int           `bson:"minTriggerValue" json:minTriggerValue"`
+	MinTriggerValue  int           `bson:"minTriggerValue" json:"minTriggerValue"`
 	LatestKnownTrack int64         `bson:"latestKnownTrack" json:"latestKnownTrack"`
 }
