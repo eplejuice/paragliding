@@ -32,4 +32,4 @@ Make an .env file containing
 ## Test and expected results
 
 ### Tested using [Postman](https://www.getpostman.com/)
-### MongoDB hosten on [mLab](https://mlab.com/home)
+### MongoDB hosted on [mLab](https://mlab.com/home)
