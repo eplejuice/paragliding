@@ -15,7 +15,11 @@ Develop an online service that will allow users to browse information about IGC 
     https://github.com/gorilla/mux
     gopkg.in/mgo.v2
     gopkg.in/mgo.v2/bson
- 
+    
+#### Why use [mgo](https://github.com/globalsign/mgo) instead of the [official MongoDB Go driver](https://github.com/mongodb/mongo-go-driver) ?
+- In my opinion, easier installation and better documentation.
+
+
 ### Quality
 - [x] Golint
 - [x] GoVet
