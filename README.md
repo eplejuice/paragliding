@@ -8,7 +8,7 @@ Develop an online service that will allow users to browse information about IGC 
 #### Assignment link: 
     http://prod3.imt.hig.no/teaching/imt2681-2018/wikis/assignment-2
 #### Heroku link 
-    tbd
+    https://pure-stream-73485.herokuapp.com/
     
 #### External dependencies
     https://github.com/marni/goigc
@@ -37,3 +37,10 @@ Make an .env file containing
 
 ### Tested using [Postman](https://www.getpostman.com/)
 ### MongoDB hosted on [mLab](https://mlab.com/home)
+
+### Additional info
+The clocktrigger function is deployed on a VM in skyhigh Openstack with floating IP: 10.212.137.65
+
+For the prevention of duplicate IDs, i used mutex to lock and unlock critical sector while posting a new track.
+
+The entire API is not deployed on AWS as a cloud function, mainly because we have yet to gain access to AWS
