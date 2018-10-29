@@ -37,7 +37,6 @@ func main() {
 	http.HandleFunc("/", handleRouter)
 
 	port := os.Getenv("PORT")
-	fmt.Println("WEIOJDSFOISJFIOSD " + port)
 	//Listens to the Url given by heroku
 	if err := http.ListenAndServe(":"+port, nil); err != nil {
 		// If the Url is wrong the program shuts down immediately.

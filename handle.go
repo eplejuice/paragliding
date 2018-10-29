@@ -329,7 +329,7 @@ func handleParaglidingAPITrackIDField(w http.ResponseWriter, r *http.Request) {
 		tmp := path.Dir(r.URL.Path)
 		nummer := path.Base(tmp)
 
-		if !bson.IsObjectIdHex(tmp) {
+		if !bson.IsObjectIdHex(nummer) {
 			status := http.StatusBadRequest
 			http.Error(w, http.StatusText(status), status)
 			return

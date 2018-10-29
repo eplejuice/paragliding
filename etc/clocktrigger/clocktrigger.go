@@ -35,7 +35,7 @@ func main() {
 func getTimestamp() {
 	// Hardcoded webhook Url, explained in README, PLEASE DO NOT MISSUSE
 	webhookURL := "https://discordapp.com/api/webhooks/506125670343245838/KGFKq19syBBPdygeypfnepVJv7wpVraj64f5EebhKUabYVYQ_rqUC1rE9S-e7WJNSl4j"
-	response, err := http.Get("http://localhost:8080/paragliding/api/ticker/latest")
+	response, err := http.Get("https://pure-stream-73485.herokuapp.com/paragliding/api/ticker/latest")
 	if err != nil {
 		fmt.Println("Error getting latest")
 		return
